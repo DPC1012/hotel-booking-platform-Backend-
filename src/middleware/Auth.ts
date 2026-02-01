@@ -2,46 +2,50 @@ import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 
 export interface DecodedToken {
-  userId: string;
+  id: string;
   role: string;
 }
+const { verify } = jwt
 export const AuthMiddleware = (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
-  const {authorization} = req.headers as { authorization : string};
-  const token = authorization.split(" ")[1];
-  if (!token) {
-    res.status(401).json({
+  const {authorization} = req.headers as { authorization: string};
+  if (!authorization?.startsWith("Bearer "))
+    return res.status(401).json({
       success: false,
       data: null,
       error: "UNAUTHORIZED",
     });
-    return;
+  const token = authorization.slice(7);
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      data: null,
+      error: "UNAUTHORIZED",
+    });
   }
   try {
-    const DecodedToken = jwt.verify(
+    const Decoded = verify(
       token,
-      process.env.JWT_SECRET as string,
+      process.env.JWT_SECRET || "",
     ) as DecodedToken;
-    if (!DecodedToken) {
-      res.status(401).json({
+    if (!Decoded) {
+      return res.status(401).json({
         success: false,
         data: null,
         error: "UNAUTHORIZED",
       });
-      return;
     }
-    (req as any).userId = DecodedToken.userId;
-    (req as any).role = DecodedToken.role;
+    req.userId = Decoded.id;
+    req.role = Decoded.role;
     next();
   } catch (error) {
-    res.status(401).json({
+    return res.status(401).json({
       success: false,
       data: null,
       error: "UNAUTHORIZED",
     });
-    return;
   }
 };
